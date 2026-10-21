@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Kafka</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/smoothie/1.36.1/smoothie.min.js"></script>
+  </head>
+
+  <body>
+    <h2>Visualisation des visites de pages</h2>
+
+    <p>Statistiques en temps réel</p>
+    <p id="status">Connexion au serveur...</p>
+
+    <canvas id="chart2" width="800" height="350"></canvas>
+
+    <script>
+      const pages = {};
+      const colors = ["#00FF00", "#FF0000"];
+      let colorIndex = 0;
+
+      const smoothie = new SmoothieChart({
+        grid: {
+          fillStyle: "#111111",
+          strokeStyle: "#555555",
+        },
+        labels: {
+          fillStyle: "#FFFFFF",
+        },
+        millisPerPixel: 50,
+      });
+
+      smoothie.streamTo(document.getElementById("chart2"), 1000);
+
+      function getSeries(page) {
+        if (!pages[page]) {
+          pages[page] = new TimeSeries();
+
+          smoothie.addTimeSeries(pages[page], {
+            strokeStyle: colors[colorIndex++ % colors.length],
+            lineWidth: 2,
+          });
+        }
+
+        return pages[page];
+      }
+
+      getSeries("P1");
+      getSeries("P2");
+
+      const eventSource = new EventSource("/analytics");
+
+      eventSource.onopen = function () {
+        document.getElementById("status").textContent =
+          "Connecté - Réception des événements";
+      };
+
+      eventSource.onmessage = function (event) {
+        const data = JSON.parse(event.data);
+        const time = Date.now();
+
+        for (const page in pages) {
+          pages[page].append(time, data[page] ?? 0);
+        }
+      };
+
+      eventSource.onerror = function () {
+        document.getElementById("status").textContent = "Connexion interrompue";
+      };
+    </script>
+  </body>
+</html>
